@@ -8,10 +8,11 @@ CD = 1.27 * AB
 CM = 1.27 * AB
 AD = 0.5 * AB
 ANGLE = 123 / 180 * np.pi
-N = 100  # количество оборотов
-delay_value = 0.002  # значение задержки
+N = 100  # количество точек
+delay_value = 0.001  # значение задержки
 rotate_angle = 2 * np.pi  # угол поворота
-omega = (rotate_angle / N) / delay_value
+omega = (rotate_angle / N) / delay_value / 100
+phi = np.linspace(0, rotate_angle, N)
 velocity = {'B': [], 'C': [], 'M': []}
 acceleration = {'B': [], 'C': [], 'M': []}
 
@@ -29,8 +30,12 @@ def get_dist(x, y):
 
 
 def point_velocity(phi, i, x, y):
-    dx = numerical_derivative(x(i), x(i - 1), phi[i] - phi[i - 1])
-    dy = numerical_derivative(y(i), y(i - 1), phi[i] - phi[i - 1])
+    if i == 50:
+        dx = numerical_derivative(x(i + 1), x(i), phi[i + 1] - phi[i])
+        dy = numerical_derivative(y(i + 1), y(i), phi[i + 1] - phi[i])
+    else:
+        dx = numerical_derivative(x(i), x(i - 1), phi[i] - phi[i - 1])
+        dy = numerical_derivative(y(i), y(i - 1), phi[i] - phi[i - 1])
     return dx, dy
 
 
@@ -45,32 +50,35 @@ def point_calcs(phi, i, x, y, link):
         dx, dy = point_velocity(phi, i, x, y)
         velocity_point = np.sqrt(dx ** 2 + dy ** 2) * omega
         if link in velocity.keys():
-            velocity[link].append(velocity_point)
+            velocity[link].append([velocity_point, x(i), y(i)])
         else:
-            velocity[link] = [velocity_point]
-        if i < len(phi):
+            velocity[link] = [[velocity_point, x(i), y(i)]]
+        if i < len(phi) - 1:
             dx_2, dy_2 = point_acceleration(phi, i, x, y)
+            if i == 50:
+                print(x(i + 1), x(i), x(i - 1))
+                print(y(i + 1), y(i), y(i - 1))
+                print(dx_2, dy_2, np.sqrt(dx_2 ** 2 + dy_2 ** 2) * omega ** 2 + (np.sqrt(dx ** 2 + dy ** 2) * 0))
             acceleration_point = np.sqrt(dx_2 ** 2 + dy_2 ** 2) * omega ** 2 + (np.sqrt(dx ** 2 + dy ** 2) * 0)
             if link in velocity.keys():
-                acceleration[link].append(acceleration_point)
+                acceleration[link].append([acceleration_point, x(i), y(i)])
             else:
-                acceleration[link] = [acceleration_point]
+                acceleration[link] = [[acceleration_point, x(i), y(i)]]
 
 
 def main():
     max_length = max(AB, BC, CD, CM, AD)
     x_m = []
     y_m = []
-    phi = np.linspace(0, 2 * np.pi, N)
 
     plt.ion()
-    for i in range(len(phi) - 1):
-        phi[i] %= 2 * np.pi
+    for i in range(len(phi)):
         plt.clf()
         # B point
         B_point_x = lambda i: np.cos(phi[i]) * AB
         B_point_y = lambda i: np.sin(phi[i]) * AB
 
+        plt.annotate(f'time: {delay_value * i:.4g}', (0, -5))
         plt.scatter(B_point_x(i), B_point_y(i), color='#f50800')
         plt.annotate("B", (B_point_x(i), B_point_y(i)))
         plt.plot([0, B_point_x(i)], [0, B_point_y(i)],
@@ -80,7 +88,7 @@ def main():
         plt.scatter(-AD, 0, color='b')
         plt.annotate("D", (-AD, 0))
 
-        if phi[i] > np.pi:
+        if phi[i] >= np.pi:
             BD = lambda i: np.sqrt(AD ** 2 + AB ** 2 - 2 * AB * AD * np.cos(phi[i] - np.pi))
             BDA_angle = lambda i: np.arccos((BD(i) ** 2 + AD ** 2 - AB ** 2) / (2 * BD(i) * AD))
             CDB_angle = lambda i: np.arccos((BD(i) ** 2 + CD ** 2 - BC ** 2) / (2 * BD(i) * CD))
@@ -141,10 +149,14 @@ def main():
     plt.ioff()
     plt.show()
     for key, value in velocity.items():
-        print('Point:', key)
-        for vel in value:
-            print(vel)
-    print(acceleration)
+        plt.plot([i * delay_value for i in range(1, len(phi))], [item[0] for item in value])
+        plt.title(f'Скорость точки {key}')
+        plt.show()
+
+    for key, value in acceleration.items():
+        plt.plot([i * delay_value for i in range(1, len(phi) - 1)], [item[0] for item in value])
+        plt.title(f'Ускорение точки {key}')
+        plt.show()
 
 
 if __name__ == '__main__':
